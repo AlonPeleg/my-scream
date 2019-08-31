@@ -11,6 +11,7 @@ app.get("/screams", async (req, res) => {
     const data = await admin
       .firestore()
       .collection("screams")
+      .orderBy("createdAt", "desc")
       .get();
     let screams = [];
     data.forEach(doc => {
@@ -29,7 +30,7 @@ app.post("/scream", async (req, res) => {
   const newScream = {
     body: req.body.body,
     userHandle: req.body.userHandle,
-    createdAt: admin.firestore.Timestamp.fromDate(new Date())
+    createdAt: new Date().toISOString()
   };
   try {
     const doc = await admin
