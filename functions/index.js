@@ -17,10 +17,11 @@ const firebaseConfig = {
 const firebase = require("firebase");
 firebase.initializeApp(firebaseConfig);
 
+const db = admin.firestore();
+
 app.get("/screams", async (req, res) => {
   try {
-    const data = await admin
-      .firestore()
+    const data = await db
       .collection("screams")
       .orderBy("createdAt", "desc")
       .get();
@@ -44,10 +45,7 @@ app.post("/scream", async (req, res) => {
     createdAt: new Date().toISOString()
   };
   try {
-    const doc = await admin
-      .firestore()
-      .collection("screams")
-      .add(newScream);
+    const doc = await db.collection("screams").add(newScream);
     res.json({ message: `document ${doc.id} created successfully` });
   } catch (err) {
     res.status(500).json({ error: "Server Error" });
@@ -55,26 +53,35 @@ app.post("/scream", async (req, res) => {
 });
 
 // Signup route
-app.post("/signup", async (req, res) => {
+app.post("/signup", (req, res) => {
   const newUser = {
     email: req.body.email,
     password: req.body.password,
     confirmPassword: req.body.confirmPassword,
-    confirmPassword: req.body.confirmPassword,
     handle: req.body.handle
   };
   // TODO: validate data
-  try {
-    const data = await firebase
-      .auth()
-      .createUserWithEmailAndPassword(newUser.email, newUser.password);
-    return res
-      .status(201)
-      .json({ message: `user ${data.user.uid} signed up successfully` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server Error" });
-  }
+
+  db.doc(`/users/${newUser.handle}`)
+    .get()
+    .then(doc => {
+      if (doc.exists) {
+        return res.status(400).json({ handle: "This handle is already taken" });
+      }
+      return firebase
+        .auth()
+        .createUserWithEmailAndPassword(newUser.email, newUser.password);
+    })
+    .then(data => {
+      return data.user.getIdToken();
+    })
+    .then(token => {
+      return res.status(201).json({ token });
+    })
+    .catch(err => {
+      console.error(err);
+      return res.status(500).json({ error: "Server Error" });
+    });
 });
 
 exports.api = functions.region("europe-west1").https.onRequest(app);
